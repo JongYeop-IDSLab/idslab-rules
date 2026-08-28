@@ -4,7 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>근태 · 벌금 현황 — IDS Lab</title>
-<meta name="description" content="IDS Lab 출근 체크와 이번 달 지각·벌금 현황">
+<meta name="description" content="IDS Lab 이번 달 지각·재택·휴가 현황과 누적 벌금">
+<meta name="robots" content="noindex">
 <meta name="theme-color" content="#0f766e">
 <link rel="preconnect" href="https://cdn.jsdelivr.net">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
@@ -17,64 +18,63 @@
   <a class="backlink" href="./index.html">← 연구실 수칙</a>
   <div class="eyebrow">
     <span class="badge" id="todayBadge">—</span>
-    <span class="badge plain" id="coreBadge">코어타임 10:00 – 15:00</span>
+    <span class="badge plain" id="adminBadge" hidden>관리자 모드</span>
   </div>
   <h1>근태 · 벌금 현황</h1>
-  <p class="lede">출근하면 아래에서 체크해 주세요. 이번 달 지각 횟수와 누적 벌금이 자동으로 계산됩니다.</p>
+  <p class="lede">지각 · 재택 · 휴가는 랩장이 기록합니다. 기록이 없는 날은 정상 출근으로 봅니다.</p>
 </header>
 
 <main>
 
-  <section id="checkin">
-    <div class="sec-head"><span class="num">✓</span><h2>오늘 체크</h2></div>
-    <p class="sec-sub" id="clock">—</p>
-
-    <label class="field">
-      <span class="lab">이름</span>
-      <select id="name"><option value="">불러오는 중…</option></select>
-    </label>
-
-    <div class="btnrow">
-      <button class="primary" data-mode="출근" disabled>출근</button>
-      <button data-mode="재택" disabled>재택</button>
-      <button data-mode="휴가" disabled>휴가</button>
-    </div>
-
-    <div class="msg" id="msg"></div>
-  </section>
-
-  <section id="mine">
-    <div class="sec-head"><span class="num">나</span><h2>이번 달 내 현황</h2></div>
-    <p class="sec-sub" id="mineSub">이름을 선택하면 표시됩니다.</p>
-    <div class="stats" id="mineStats" hidden>
-      <div class="stat"><div class="k">지각</div><div class="v" id="sLate">0회</div></div>
-      <div class="stat"><div class="k">누적 벌금</div><div class="v" id="sFine">0원</div></div>
-      <div class="stat"><div class="k">다음 지각 시</div><div class="v" id="sNext">—</div></div>
-      <div class="stat"><div class="k">재택 사용</div><div class="v" id="sRemote">—</div></div>
-    </div>
-  </section>
-
   <section id="today">
-    <div class="sec-head"><span class="num">今</span><h2>오늘 체크한 사람</h2></div>
-    <p class="sec-sub">이름 옆 시각은 체크한 시간입니다.</p>
+    <div class="sec-head"><span class="num">今</span><h2>오늘</h2></div>
+    <p class="sec-sub" id="clock">—</p>
     <div class="chips" id="todayChips"><div class="skeleton">불러오는 중…</div></div>
   </section>
 
+  <section id="admin" hidden>
+    <div class="sec-head"><span class="num">✎</span><h2>기록 입력</h2></div>
+    <p class="sec-sub">해당 날짜에 <strong>예외가 있는 사람만</strong> 지정하세요. 비워 두면 정상 출근으로 처리됩니다.</p>
+
+    <label class="field">
+      <span class="lab">날짜</span>
+      <input type="date" id="adminDate">
+    </label>
+
+    <div id="adminRows"></div>
+
+    <div class="btnrow one">
+      <button class="primary" id="saveBtn">이 날짜 저장</button>
+    </div>
+    <div class="msg" id="msg"></div>
+  </section>
+
   <section id="board">
-    <div class="sec-head"><span class="num">月</span><h2>이번 달 전체</h2></div>
-    <p class="sec-sub" id="boardSub">매월 1일에 초기화됩니다.</p>
+    <div class="sec-head"><span class="num">月</span><h2>월간 현황</h2></div>
+    <div class="monthnav">
+      <button type="button" id="prevMonth" aria-label="이전 달">‹</button>
+      <span id="monthLabel">—</span>
+      <button type="button" id="nextMonth" aria-label="다음 달">›</button>
+    </div>
     <div class="tablewrap">
       <table>
-        <thead><tr><th>이름</th><th>기록일</th><th>재택</th><th>지각</th><th>벌금</th></tr></thead>
+        <thead><tr><th>이름</th><th>지각</th><th>재택</th><th>휴가</th><th>벌금</th></tr></thead>
         <tbody id="boardBody"><tr><td colspan="5" class="skeleton">불러오는 중…</td></tr></tbody>
       </table>
     </div>
+    <p class="acc-note" id="boardNote">벌금은 매월 1일에 초기화됩니다.</p>
+  </section>
+
+  <section id="detail">
+    <div class="sec-head"><span class="num">記</span><h2>이번 달 기록</h2></div>
+    <p class="sec-sub">지각 · 재택 · 휴가 · 결근으로 기록된 날만 표시됩니다.</p>
+    <div class="chips" id="detailChips"><div class="skeleton">불러오는 중…</div></div>
   </section>
 
 </main>
 
 <footer>
-  <p>기록이 잘못됐으면 랩장에게 알려 주세요. 구글 시트에서 바로 수정할 수 있습니다.</p>
+  <p>기록이 잘못됐으면 랩장에게 알려 주세요.</p>
   <p>IDS Lab (Intelligent Digital Systems Lab), Sungkyunkwan University</p>
 </footer>
 
@@ -85,10 +85,16 @@
    Apps Script 웹 앱 배포 후 받은 /exec 주소를 여기에 붙여넣으세요.
    예: https://script.google.com/macros/s/AKfycb.../exec
 ------------------------------------------------------------------ */
-var API_URL = "https://script.google.com/macros/s/AKfycbzUc1-QXu3cbfgT7YCuMPo5hbVUOrUnjR_3vZwP5ppONJBjWJuyq8PFpQErf9j2BDTiTg/exec";
+var API_URL = "";
+
+/* 관리자 열쇠는 이 파일에 절대 넣지 마세요. 주소창의 ?admin=... 으로만 전달되고,
+   진짜 확인은 Apps Script(서버)에서 '설정' 시트의 값과 대조해 이뤄집니다. */
+var ADMIN_KEY = new URLSearchParams(location.search).get("admin") || "";
 
 var $ = function (id) { return document.getElementById(id); };
-var state = { members: [], summary: [], config: null, month: "" };
+var state = { month: "", members: [], records: [], summary: [], admin: false };
+
+var STATUS_CLASS = { "지각": "late", "재택": "remote", "휴가": "leave", "결근": "absent" };
 
 function won(n) { return Number(n || 0).toLocaleString("ko-KR") + "원"; }
 
@@ -98,130 +104,183 @@ function say(text, kind) {
   el.className = "msg show " + (kind || "info");
 }
 
-function remember(name) { try { localStorage.setItem("idslab.name", name); } catch (e) {} }
-function recall() { try { return localStorage.getItem("idslab.name") || ""; } catch (e) { return ""; } }
-
-function api(action, payload) {
+function api(payload, month) {
   if (!API_URL) {
     return Promise.reject(new Error("API 주소가 아직 연결되지 않았습니다. attendance.html 의 API_URL 을 채워 주세요."));
   }
-  var url = API_URL, opts = {};
   if (payload) {
-    opts = {
+    return fetch(API_URL, {
       method: "POST",
-      // text/plain 으로 보내야 프리플라이트 없이 Apps Script 가 받습니다.
       headers: { "Content-Type": "text/plain;charset=utf-8" },
       body: JSON.stringify(payload)
-    };
-  } else {
-    url += "?action=" + encodeURIComponent(action);
+    }).then(function (r) { return r.json(); });
   }
-  return fetch(url, opts).then(function (r) { return r.json(); });
+  var url = API_URL + "?month=" + encodeURIComponent(month || "");
+  if (ADMIN_KEY) url += "&key=" + encodeURIComponent(ADMIN_KEY);
+  return fetch(url).then(function (r) { return r.json(); });
 }
 
-function setButtons(on) {
-  var btns = document.querySelectorAll(".btnrow button");
-  for (var i = 0; i < btns.length; i++) btns[i].disabled = !on;
+/* ---------------- 렌더 ---------------- */
+
+function shiftMonth(month, delta) {
+  var y = Number(month.slice(0, 4)), m = Number(month.slice(5, 7)) + delta;
+  y += Math.floor((m - 1) / 12);
+  m = ((m - 1) % 12 + 12) % 12 + 1;
+  return y + "-" + (m < 10 ? "0" : "") + m;
 }
 
 function renderClock() {
-  var d = new Date();
-  var days = ["일", "월", "화", "수", "목", "금", "토"];
+  var d = new Date(), days = ["일", "월", "화", "수", "목", "금", "토"];
   var pad = function (n) { return (n < 10 ? "0" : "") + n; };
-  $("clock").textContent =
-    d.getFullYear() + "년 " + (d.getMonth() + 1) + "월 " + d.getDate() + "일 ("
-    + days[d.getDay()] + ") " + pad(d.getHours()) + ":" + pad(d.getMinutes());
+  $("clock").textContent = d.getFullYear() + "년 " + (d.getMonth() + 1) + "월 " + d.getDate()
+    + "일 (" + days[d.getDay()] + ") " + pad(d.getHours()) + ":" + pad(d.getMinutes());
   $("todayBadge").textContent = (d.getMonth() + 1) + "월 " + d.getDate() + "일 (" + days[d.getDay()] + ")";
 }
 
-function renderMine() {
-  var name = $("name").value;
-  var mine = state.summary.filter(function (s) { return s.name === name; })[0];
-  if (!name || !mine) {
-    $("mineStats").hidden = true;
-    $("mineSub").textContent = "이름을 선택하면 표시됩니다.";
-    return;
-  }
-  var c = state.config || {};
-  $("mineStats").hidden = false;
-  $("mineSub").textContent = name + " 님 · " + state.month;
-  $("sLate").textContent = mine.lateCount + "회";
-  $("sLate").className = "v" + (mine.lateCount ? " alert" : "");
-  $("sFine").textContent = won(mine.fine);
-  $("sFine").className = "v" + (mine.fine ? " alert" : "");
-  $("sNext").textContent = won(mine.nextFine);
-  $("sRemote").textContent = mine.remote + " / " + (c.remoteMonthly || 3) + "회";
+function chip(text, status) {
+  var el = document.createElement("span");
+  el.className = "chip " + (STATUS_CLASS[status] || "");
+  el.innerHTML = text;
+  return el;
 }
 
 function renderToday(records) {
   var box = $("todayChips");
   box.innerHTML = "";
   if (!records || !records.length) {
-    box.innerHTML = '<div class="skeleton">아직 아무도 체크하지 않았습니다.</div>';
+    box.innerHTML = '<div class="skeleton">오늘은 특이사항이 없습니다. 모두 정상 출근입니다.</div>';
     return;
   }
   records.forEach(function (r) {
-    var cls = "chip" + (r.late ? " late" : (r.mode === "재택" ? " remote" : ""));
-    var tag = r.mode === "출근" ? (r.late ? "지각" : "출근") : r.mode;
-    var el = document.createElement("span");
-    el.className = cls;
-    el.innerHTML = "<b>" + r.name + "</b> · " + tag + " " + r.time;
-    box.appendChild(el);
+    box.appendChild(chip("<b>" + r.name + "</b> · " + r.status + (r.note ? " (" + r.note + ")" : ""), r.status));
+  });
+}
+
+function renderDetail() {
+  var box = $("detailChips");
+  box.innerHTML = "";
+  if (!state.records.length) {
+    box.innerHTML = '<div class="skeleton">이번 달 기록이 없습니다.</div>';
+    return;
+  }
+  state.records.slice().sort(function (a, b) { return a.date < b.date ? 1 : -1; }).forEach(function (r) {
+    var d = r.date.slice(5).replace("-", "/");
+    box.appendChild(chip(d + " <b>" + r.name + "</b> " + r.status + (r.note ? " (" + r.note + ")" : ""), r.status));
   });
 }
 
 function renderBoard() {
   var body = $("boardBody");
   body.innerHTML = "";
+  $("monthLabel").textContent = state.month.replace("-", "년 ") + "월";
   if (!state.summary.length) {
-    body.innerHTML = '<tr><td colspan="5" class="skeleton">기록이 없습니다.</td></tr>';
+    body.innerHTML = '<tr><td colspan="5" class="skeleton">구성원이 없습니다.</td></tr>';
     return;
   }
   state.summary.forEach(function (s) {
+    var z = function (n) { return n ? "" : "zero"; };
     var tr = document.createElement("tr");
     tr.innerHTML =
-      '<td class="name">' + s.name + (s.note ? ' <span class="note">' + s.note + "</span>" : "") + "</td>" +
-      "<td>" + s.days + "</td>" +
-      '<td class="' + (s.remote ? "" : "zero") + '">' + s.remote + "</td>" +
-      '<td class="' + (s.lateCount ? "" : "zero") + '">' + s.lateCount + "</td>" +
-      '<td class="' + (s.fine ? "" : "zero") + '">' + won(s.fine) + "</td>";
+      '<td class="name">' + s.name + "</td>" +
+      '<td class="' + z(s.late) + '">' + s.late + "</td>" +
+      '<td class="' + z(s.remote) + '">' + s.remote + "</td>" +
+      '<td class="' + z(s.leave) + '">' + s.leave + "</td>" +
+      '<td class="' + z(s.fine) + '">' + won(s.fine) + "</td>";
     body.appendChild(tr);
   });
-  $("boardSub").textContent = state.month + " 기준 · 매월 1일에 초기화됩니다.";
+  var total = state.summary.reduce(function (a, s) { return a + s.fine; }, 0);
+  var lim = state.config.remoteMonthly || 3;
+  $("boardNote").textContent = (total ? "이번 달 합계 " + won(total) + " · " : "")
+    + "재택 한도 월 " + lim + "회 · 벌금은 매월 1일에 초기화됩니다.";
 }
 
-function applyBootstrap(d) {
-  state.members = d.members || [];
-  state.summary = d.summary || [];
-  state.config = d.config || {};
-  state.month = d.month || "";
+/* ---------------- 관리자 입력 ---------------- */
 
-  var sel = $("name"), saved = recall();
-  sel.innerHTML = '<option value="">— 이름 선택 —</option>';
-  state.members.forEach(function (n) {
-    var o = document.createElement("option");
-    o.value = n; o.textContent = n;
-    if (n === saved) o.selected = true;
-    sel.appendChild(o);
+function renderAdminRows() {
+  var date = $("adminDate").value;
+  var box = $("adminRows");
+  box.innerHTML = "";
+  if (!date) return;
+
+  var current = {};
+  state.records.forEach(function (r) { if (r.date === date) current[r.name] = r; });
+
+  state.members.forEach(function (m) {
+    var cur = current[m.name] || { status: "", note: "" };
+    var row = document.createElement("div");
+    row.className = "arow" + (cur.status ? " set" : "");
+    row.innerHTML =
+      '<span class="aname">' + m.name + "</span>" +
+      '<select data-name="' + m.name + '">' +
+        '<option value="">정상 출근</option>' +
+        ["지각", "재택", "휴가", "결근"].map(function (s) {
+          return '<option value="' + s + '"' + (cur.status === s ? " selected" : "") + ">" + s + "</option>";
+        }).join("") +
+      "</select>" +
+      '<input type="text" class="anote" data-name="' + m.name + '" placeholder="비고" value="' +
+        String(cur.note).replace(/"/g, "&quot;") + '">';
+    box.appendChild(row);
   });
 
-  if (d.config) {
-    $("coreBadge").textContent = "코어타임 " + d.config.coreStart + " – 15:00";
-  }
-  setButtons(true);
-  renderToday(d.todayRecords);
-  renderBoard();
-  renderMine();
 }
 
-function load() {
-  api("bootstrap").then(function (d) {
-    if (!d.ok) { say(d.error || "불러오지 못했습니다.", "err"); return; }
-    applyBootstrap(d);
+function saveDay() {
+  var date = $("adminDate").value;
+  if (!date) { say("날짜를 선택해 주세요.", "err"); return; }
+
+  var entries = [];
+  state.members.forEach(function (m) {
+    var sel = document.querySelector('#adminRows select[data-name="' + CSS.escape(m.name) + '"]');
+    var note = document.querySelector('#adminRows input[data-name="' + CSS.escape(m.name) + '"]');
+    entries.push({ name: m.name, status: sel ? sel.value : "", note: note ? note.value : "" });
+  });
+
+  $("saveBtn").disabled = true;
+  say("저장하는 중…", "info");
+  api({ action: "save", key: ADMIN_KEY, date: date, entries: entries }).then(function (d) {
+    $("saveBtn").disabled = false;
+    if (!d.ok) { say(d.error, "err"); return; }
+    apply(d);
+    var parts = [];
+    if (d.saved) parts.push(d.saved + "건 기록");
+    if (d.cleared) parts.push(d.cleared + "명 정상 출근");
+    say(date + " 저장 완료 — " + (parts.join(" · ") || "변경 없음"), "ok");
   }).catch(function (e) {
-    say(e.message || "서버에 연결하지 못했습니다.", "err");
-    $("name").innerHTML = '<option value="">연결 안 됨</option>';
-    $("todayChips").innerHTML = '<div class="skeleton">—</div>';
+    $("saveBtn").disabled = false;
+    say(e.message || "저장에 실패했습니다.", "err");
+  });
+}
+
+/* ---------------- 부트 ---------------- */
+
+function apply(d) {
+  state.month = d.month;
+  state.members = d.members || [];
+  state.records = d.records || [];
+  state.summary = d.summary || [];
+  state.config = d.config || {};
+  state.admin = !!d.admin;
+
+  $("adminBadge").hidden = !state.admin;
+  $("admin").hidden = !state.admin;
+
+  renderToday(d.todayRecords);
+  renderBoard();
+  renderDetail();
+  if (state.admin) {
+    if (!$("adminDate").value) $("adminDate").value = d.today;
+    renderAdminRows();
+  }
+}
+
+function load(month) {
+  api(null, month).then(function (d) {
+    if (!d.ok) { say(d.error || "불러오지 못했습니다.", "err"); return; }
+    if (ADMIN_KEY && !d.admin) say("관리자 열쇠가 올바르지 않습니다. 조회 전용으로 표시합니다.", "err");
+    apply(d);
+  }).catch(function (e) {
+    $("todayChips").innerHTML = '<div class="skeleton">' + (e.message || "서버에 연결하지 못했습니다.") + "</div>";
+    $("detailChips").innerHTML = '<div class="skeleton">—</div>';
     $("boardBody").innerHTML = '<tr><td colspan="5" class="skeleton">—</td></tr>';
   });
 }
@@ -230,36 +289,20 @@ document.addEventListener("DOMContentLoaded", function () {
   renderClock();
   setInterval(renderClock, 30000);
 
-  $("name").addEventListener("change", function () {
-    remember(this.value);
-    renderMine();
+  $("prevMonth").addEventListener("click", function () { load(shiftMonth(state.month, -1)); });
+  $("nextMonth").addEventListener("click", function () { load(shiftMonth(state.month, 1)); });
+  $("adminDate").addEventListener("change", function () {
+    var m = this.value.slice(0, 7);
+    if (m && m !== state.month) load(m); else renderAdminRows();
+  });
+  $("saveBtn").addEventListener("click", saveDay);
+  $("adminRows").addEventListener("change", function (ev) {
+    if (ev.target.tagName === "SELECT") {
+      ev.target.closest(".arow").classList.toggle("set", !!ev.target.value);
+    }
   });
 
-  document.querySelectorAll(".btnrow button").forEach(function (btn) {
-    btn.addEventListener("click", function () {
-      var name = $("name").value;
-      if (!name) { say("이름을 먼저 선택해 주세요.", "err"); return; }
-      var mode = btn.getAttribute("data-mode");
-      if (mode === "휴가" && !confirm(name + " 님, 오늘을 휴가로 기록할까요?")) return;
-
-      setButtons(false);
-      say("기록하는 중…", "info");
-      api(null, { action: "checkin", name: name, mode: mode }).then(function (d) {
-        setButtons(true);
-        if (!d.ok) { say(d.error, "err"); return; }
-        say(d.message, d.late ? "err" : "ok");
-        state.summary = d.summary || state.summary;
-        renderMine();
-        renderBoard();
-        return api("bootstrap").then(function (b) { if (b.ok) renderToday(b.todayRecords); });
-      }).catch(function (e) {
-        setButtons(true);
-        say(e.message || "기록에 실패했습니다. 다시 시도해 주세요.", "err");
-      });
-    });
-  });
-
-  load();
+  load("");
 });
 </script>
 </body>

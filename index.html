@@ -61,7 +61,7 @@
   </ul>
 
   <div class="callout calm">
-    남은 재택 횟수는 <a href="./attendance.html">근태 페이지</a>에서 확인할 수 있습니다.
+    사용 현황은 <a href="./attendance.html">근태 페이지</a>에서 확인할 수 있습니다.
   </div>
 </section>
 
@@ -74,16 +74,8 @@
     <li><strong>1회당 벌금은 3만원을 넘지 않습니다.</strong></li>
     <li>누적 벌금은 <strong>매월 1일에 초기화</strong>됩니다.</li>
     <li>사전에 알린 재택근무 · 휴가 · 공식 일정은 지각으로 보지 않습니다.</li>
+    <li>지각 · 재택 · 휴가 기록은 <strong>랩장이 관리</strong>합니다. 잘못된 기록이 있으면 알려 주세요.</li>
   </ul>
-
-  <div class="account">
-    <div class="acc-label">벌금 송금 계좌</div>
-    <div class="acc-row">
-      <span class="acc-num" id="acct">3333-32-5209227<span class="acc-bank">카카오뱅크</span></span>
-      <button type="button" class="copy" id="copyBtn" data-acct="3333325209227">계좌번호 복사</button>
-    </div>
-    <p class="acc-note">송금 후 랩장에게 알려 주세요.</p>
-  </div>
 
   <div class="tablewrap">
     <table>
@@ -132,7 +124,7 @@
 <a class="cta" href="./attendance.html">
   <div>
     <div class="t">근태 · 벌금 현황</div>
-    <div class="d">출근 체크, 이번 달 지각 횟수와 누적 벌금, 남은 재택 횟수</div>
+    <div class="d">이번 달 지각 횟수와 누적 벌금, 재택·휴가 사용 현황</div>
   </div>
   <div class="go">열기 →</div>
 </a>
@@ -147,40 +139,5 @@
 
 </div>
 
-<script>
-(function () {
-  var btn = document.getElementById("copyBtn");
-  if (!btn) return;
-  btn.addEventListener("click", function () {
-    var text = btn.getAttribute("data-acct");
-    var done = function () {
-      btn.textContent = "복사됨";
-      btn.classList.add("done");
-      setTimeout(function () {
-        btn.textContent = "계좌번호 복사";
-        btn.classList.remove("done");
-      }, 1800);
-    };
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(text).then(done, fallback);
-    } else {
-      fallback();
-    }
-    function fallback() {
-      // 카카오톡 인앱 브라우저 등 clipboard API가 막힌 환경
-      var ta = document.createElement("textarea");
-      ta.value = text;
-      ta.setAttribute("readonly", "");
-      ta.style.cssText = "position:absolute;left:-9999px;top:0";
-      document.body.appendChild(ta);
-      ta.select();
-      ta.setSelectionRange(0, text.length);
-      try { document.execCommand("copy"); done(); }
-      catch (e) { btn.textContent = "길게 눌러 복사"; }
-      document.body.removeChild(ta);
-    }
-  });
-})();
-</script>
 </body>
 </html>

@@ -1,24 +1,29 @@
 /**
  * IDS Lab 근태 관리 백엔드 (Google Apps Script)
  *
- * 처음 한 번만: 스크립트 편집기에서 setupSheets() 를 실행한 뒤,
- * 배포 > 새 배포 > 웹 앱 (실행: 나, 액세스: 모든 사용자) 으로 배포하세요.
- * 발급된 /exec URL 을 attendance.html 의 API_URL 에 넣으면 됩니다.
+ * 랩장(관리자)만 기록을 수정할 수 있고, 나머지는 조회만 가능합니다.
+ * 관리자 확인은 반드시 이 서버 쪽에서 이뤄집니다. 페이지의 자바스크립트는
+ * 누구나 볼 수 있으므로, 열쇠는 코드가 아니라 '설정' 시트에만 둡니다.
+ *
+ * 처음 한 번만: 편집기에서 setupSheets() 실행 → 배포 > 새 배포 > 웹 앱
+ * (실행: 나 / 액세스: 모든 사용자) → 발급된 /exec 주소를 attendance.html 에 입력.
  */
 
 var SHEET_CONFIG  = '설정';
 var SHEET_MEMBERS = '구성원';
 var SHEET_LOG     = '근태기록';
 
+/** 기록하는 상태 — '정상 출근'은 기록하지 않습니다(예외만 기록). */
+var STATUSES = ['지각', '재택', '휴가', '결근'];
+
 var DEFAULTS = {
-  '코어타임시작': '10:00',
   '벌금시작일': '2026-09-14',
   '기본벌금': 10000,
   '인상액': 5000,
   '회당상한': 30000,
   '재택_월한도': 3,
   '재택_주한도': 1,
-  '관리자키': 'idslab'
+  '관리자키': ''
 };
 
 /* ------------------------------------------------------------------ */
@@ -27,34 +32,19 @@ var DEFAULTS = {
 
 function tz() { return Session.getScriptTimeZone() || 'Asia/Seoul'; }
 function ss() { return SpreadsheetApp.getActiveSpreadsheet(); }
-
 function fmtDate(d) { return Utilities.formatDate(d, tz(), 'yyyy-MM-dd'); }
-function fmtTime(d) { return Utilities.formatDate(d, tz(), 'HH:mm'); }
-
-/** 'HH:mm' -> 분 단위 정수 */
-function toMinutes(hhmm) {
-  var p = String(hhmm).split(':');
-  return parseInt(p[0], 10) * 60 + parseInt(p[1], 10);
-}
-
-/** 'yyyy-MM-dd' 의 월 키 'yyyy-MM' */
+function fmtStamp(d) { return Utilities.formatDate(d, tz(), 'yyyy-MM-dd HH:mm'); }
 function monthKey(dateStr) { return String(dateStr).slice(0, 7); }
 
-/** 'yyyy-MM-dd' 가 속한 주의 월요일 (주 = 월~일) */
+function isDateStr(s) { return /^\d{4}-\d{2}-\d{2}$/.test(String(s)); }
+
+/** 'yyyy-MM-dd' 가 속한 주의 월요일 */
 function weekKey(dateStr) {
   var p = String(dateStr).split('-');
   var d = new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
-  var dow = d.getDay();                 // 0=일 … 6=토
-  var back = (dow === 0) ? 6 : dow - 1; // 월요일까지 며칠 전인지
-  d.setDate(d.getDate() - back);
+  var dow = d.getDay();
+  d.setDate(d.getDate() - ((dow === 0) ? 6 : dow - 1));
   return Utilities.formatDate(d, tz(), 'yyyy-MM-dd');
-}
-
-/** 주말 여부 */
-function isWeekend(dateStr) {
-  var p = String(dateStr).split('-');
-  var dow = new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2])).getDay();
-  return dow === 0 || dow === 6;
 }
 
 function json(obj) {
@@ -76,15 +66,14 @@ function getConfig() {
       var key = String(rows[i][0]).trim();
       if (!key) continue;
       var val = rows[i][1];
-      if (val instanceof Date) {
-        val = (key === '코어타임시작') ? fmtTime(val) : fmtDate(val);
-      }
+      if (val instanceof Date) val = fmtDate(val);
       cfg[key] = val;
     }
   }
   ['기본벌금', '인상액', '회당상한', '재택_월한도', '재택_주한도'].forEach(function (k) {
     cfg[k] = Number(cfg[k]);
   });
+  cfg['관리자키'] = String(cfg['관리자키']).trim();
   return cfg;
 }
 
@@ -103,29 +92,41 @@ function getMembers() {
   return out;
 }
 
-/** 근태기록 전체를 객체 배열로 */
+/** 근태기록: 날짜 | 이름 | 상태 | 비고 | 수정시각 */
 function getRecords() {
   var sh = ss().getSheetByName(SHEET_LOG);
   if (!sh || sh.getLastRow() < 2) return [];
-  var rows = sh.getRange(2, 1, sh.getLastRow() - 1, 6).getValues();
+  var rows = sh.getRange(2, 1, sh.getLastRow() - 1, 5).getValues();
   var out = [];
   for (var i = 0; i < rows.length; i++) {
     var date = rows[i][0];
     if (!date) continue;
     date = (date instanceof Date) ? fmtDate(date) : String(date).trim();
-    var time = rows[i][3];
-    time = (time instanceof Date) ? fmtTime(time) : String(time || '').trim();
+    var name = String(rows[i][1]).trim();
+    var status = String(rows[i][2]).trim();
+    if (!name || !status) continue;
     out.push({
-      row: i + 2,
-      date: date,
-      name: String(rows[i][1]).trim(),
-      mode: String(rows[i][2]).trim(),
-      time: time,
-      late: String(rows[i][4]).trim() === 'Y',
-      note: String(rows[i][5] || '').trim()
+      date: date, name: name, status: status,
+      note: String(rows[i][3] || '').trim(),
+      updated: (rows[i][4] instanceof Date) ? fmtStamp(rows[i][4]) : String(rows[i][4] || '')
     });
   }
   return out;
+}
+
+/** 기록 전체를 시트에 다시 씀 (날짜·이름 순 정렬) */
+function writeRecords(records) {
+  var sh = ss().getSheetByName(SHEET_LOG);
+  records.sort(function (a, b) {
+    return a.date < b.date ? -1 : a.date > b.date ? 1 : a.name.localeCompare(b.name, 'ko');
+  });
+  var last = sh.getLastRow();
+  if (last > 1) sh.getRange(2, 1, last - 1, 5).clearContent();
+  if (!records.length) return;
+  var values = records.map(function (r) {
+    return [r.date, r.name, r.status, r.note, r.updated];
+  });
+  sh.getRange(2, 1, values.length, 5).setValues(values);
 }
 
 /* ------------------------------------------------------------------ */
@@ -133,18 +134,12 @@ function getRecords() {
 /* ------------------------------------------------------------------ */
 
 /**
- * 한 사람의 한 달치 지각 기록으로 벌금을 계산한다.
  * n번째 지각 = min(기본벌금 + 인상액 * (n-1), 회당상한)
  * 월 납부액 = 그 달 지각들의 합
- *
- * @param {Array} lateDates 벌금 대상 지각 날짜 배열 (같은 달, 정렬 여부 무관)
- * @param {Object} cfg 설정
- * @return {{count:number, total:number, each:Array}}
  */
 function calcFine(lateDates, cfg) {
   var dates = lateDates.slice().sort();
-  var each = [];
-  var total = 0;
+  var each = [], total = 0;
   for (var i = 0; i < dates.length; i++) {
     var amount = Math.min(cfg['기본벌금'] + cfg['인상액'] * i, cfg['회당상한']);
     total += amount;
@@ -155,8 +150,7 @@ function calcFine(lateDates, cfg) {
 
 /** 벌금 부과 대상인 지각인지 */
 function isFineable(rec, cfg) {
-  if (!rec.late) return false;
-  if (rec.mode !== '출근') return false;
+  if (rec.status !== '지각') return false;
   if (rec.note.indexOf('면제') >= 0) return false;
   if (rec.date < String(cfg['벌금시작일'])) return false;
   return true;
@@ -166,15 +160,18 @@ function isFineable(rec, cfg) {
 function buildSummary(month, cfg, members, records) {
   var byName = {};
   members.forEach(function (m) {
-    byName[m.name] = { name: m.name, note: m.note, lateDates: [], remote: 0, days: 0 };
+    byName[m.name] = { name: m.name, note: m.note, lateDates: [], late: 0, remote: 0, leave: 0, absent: 0 };
   });
   records.forEach(function (r) {
     if (monthKey(r.date) !== month) return;
-    if (!byName[r.name]) byName[r.name] = { name: r.name, note: '', lateDates: [], remote: 0, days: 0 };
+    if (!byName[r.name]) {
+      byName[r.name] = { name: r.name, note: '(퇴소)', lateDates: [], late: 0, remote: 0, leave: 0, absent: 0 };
+    }
     var b = byName[r.name];
-    b.days++;
-    if (r.mode === '재택') b.remote++;
-    if (isFineable(r, cfg)) b.lateDates.push(r.date);
+    if (r.status === '지각') { b.late++; if (isFineable(r, cfg)) b.lateDates.push(r.date); }
+    else if (r.status === '재택') b.remote++;
+    else if (r.status === '휴가') b.leave++;
+    else if (r.status === '결근') b.absent++;
   });
 
   var out = [];
@@ -182,13 +179,24 @@ function buildSummary(month, cfg, members, records) {
     var b = byName[name];
     var f = calcFine(b.lateDates, cfg);
     out.push({
-      name: name, note: b.note, days: b.days, remote: b.remote,
-      lateCount: f.count, fine: f.total,
+      name: name, note: b.note,
+      late: b.late, remote: b.remote, leave: b.leave, absent: b.absent,
+      fine: f.total,
       nextFine: Math.min(cfg['기본벌금'] + cfg['인상액'] * f.count, cfg['회당상한'])
     });
   });
   out.sort(function (a, b) { return b.fine - a.fine || a.name.localeCompare(b.name, 'ko'); });
   return out;
+}
+
+/* ------------------------------------------------------------------ */
+/* 관리자 확인                                                          */
+/* ------------------------------------------------------------------ */
+
+function isAdmin(key, cfg) {
+  var real = String(cfg['관리자키'] || '').trim();
+  if (!real) return false;                       // 열쇠 미설정이면 아무도 관리자가 아님
+  return String(key || '').trim() === real;
 }
 
 /* ------------------------------------------------------------------ */
@@ -198,9 +206,7 @@ function buildSummary(month, cfg, members, records) {
 function doGet(e) {
   try {
     var params = (e && e.parameter) || {};
-    var action = params.action || 'bootstrap';
-    if (action === 'bootstrap') return json(bootstrap(params.month));
-    return json({ ok: false, error: '알 수 없는 요청입니다: ' + action });
+    return json(bootstrap(params.month, params.key));
   } catch (err) {
     return json({ ok: false, error: String(err) });
   }
@@ -212,7 +218,7 @@ function doPost(e) {
     lock.waitLock(20000);
     var body = {};
     if (e && e.postData && e.postData.contents) body = JSON.parse(e.postData.contents);
-    if (body.action === 'checkin') return json(checkin(body.name, body.mode));
+    if (body.action === 'save') return json(saveDay(body.key, body.date, body.entries));
     return json({ ok: false, error: '알 수 없는 요청입니다.' });
   } catch (err) {
     return json({ ok: false, error: String(err) });
@@ -221,101 +227,79 @@ function doPost(e) {
   }
 }
 
-function bootstrap(month) {
+function bootstrap(month, key) {
   var cfg = getConfig();
   var now = new Date();
   var today = fmtDate(now);
-  month = month || monthKey(today);
+  month = isDateStr(month + '-01') ? month : monthKey(today);
+
   var members = getMembers();
   var records = getRecords();
+  var admin = isAdmin(key, cfg);
 
-  var todays = records.filter(function (r) { return r.date === today; })
-    .map(function (r) { return { name: r.name, mode: r.mode, time: r.time, late: r.late }; });
+  var monthRecords = records.filter(function (r) { return monthKey(r.date) === month; })
+    .map(function (r) { return { date: r.date, name: r.name, status: r.status, note: r.note }; });
 
   return {
     ok: true,
+    admin: admin,
     today: today,
-    now: fmtTime(now),
     month: month,
+    statuses: STATUSES,
     config: {
-      coreStart: String(cfg['코어타임시작']),
       fineStartDate: String(cfg['벌금시작일']),
       base: cfg['기본벌금'], step: cfg['인상액'], cap: cfg['회당상한'],
       remoteMonthly: cfg['재택_월한도'], remoteWeekly: cfg['재택_주한도']
     },
-    members: members.map(function (m) { return m.name; }),
-    todayRecords: todays,
+    members: members,
+    records: monthRecords,
+    todayRecords: records.filter(function (r) { return r.date === today; })
+      .map(function (r) { return { name: r.name, status: r.status, note: r.note }; }),
     summary: buildSummary(month, cfg, members, records)
   };
 }
 
-function checkin(name, mode) {
-  name = String(name || '').trim();
-  mode = String(mode || '출근').trim();
-  if (!name) return { ok: false, error: '이름을 선택해 주세요.' };
-  if (['출근', '재택', '휴가'].indexOf(mode) < 0) return { ok: false, error: '알 수 없는 구분입니다.' };
-
+/**
+ * 하루치 예외를 통째로 저장한다.
+ * entries: [{ name, status, note }] — status 가 빈 값이면 그 사람의 그날 기록을 지운다.
+ * 넘기지 않은 사람의 기존 기록은 건드리지 않는다.
+ */
+function saveDay(key, date, entries) {
   var cfg = getConfig();
+  if (!isAdmin(key, cfg)) {
+    return { ok: false, error: '수정 권한이 없습니다. 관리자 링크로 접속했는지 확인해 주세요.' };
+  }
+  if (!isDateStr(date)) return { ok: false, error: '날짜 형식이 올바르지 않습니다.' };
+  if (!entries || !entries.length) return { ok: false, error: '저장할 내용이 없습니다.' };
+
   var members = getMembers();
-  if (!members.some(function (m) { return m.name === name; })) {
-    return { ok: false, error: name + ' 님은 구성원 목록에 없습니다. 랩장에게 문의해 주세요.' };
-  }
+  var valid = {};
+  members.forEach(function (m) { valid[m.name] = true; });
 
-  var now = new Date();
-  var today = fmtDate(now);
-  var nowTime = fmtTime(now);
-  var records = getRecords();
+  var touched = {}, keep = [];
+  var stamp = fmtStamp(new Date());
+  var warnings = [];
 
-  var dup = records.filter(function (r) { return r.date === today && r.name === name; })[0];
-  if (dup) {
-    return { ok: false, error: '오늘은 이미 ' + dup.mode + '으로 기록되어 있습니다 (' + dup.time + ').' };
-  }
+  entries.forEach(function (en) {
+    var name = String(en.name || '').trim();
+    if (!name || !valid[name]) { warnings.push(name + ' — 구성원 목록에 없어 건너뜀'); return; }
+    touched[name] = true;
+    var status = String(en.status || '').trim();
+    if (!status) return;                                  // 지움
+    if (STATUSES.indexOf(status) < 0) { warnings.push(name + ' — 알 수 없는 상태 ' + status); return; }
+    keep.push({ date: date, name: name, status: status, note: String(en.note || '').trim(), updated: stamp });
+  });
 
-  // 재택 한도 검사
-  if (mode === '재택') {
-    var mine = records.filter(function (r) { return r.name === name && r.mode === '재택'; });
-    var m = mine.filter(function (r) { return monthKey(r.date) === monthKey(today); }).length;
-    if (m >= cfg['재택_월한도']) {
-      return { ok: false, error: '이번 달 재택근무를 이미 ' + m + '회 사용하셨습니다 (월 ' + cfg['재택_월한도'] + '회).' };
-    }
-    var w = mine.filter(function (r) { return weekKey(r.date) === weekKey(today); }).length;
-    if (w >= cfg['재택_주한도']) {
-      return { ok: false, error: '이번 주 재택근무를 이미 사용하셨습니다 (주 ' + cfg['재택_주한도'] + '회).' };
-    }
-  }
+  var records = getRecords().filter(function (r) {
+    return !(r.date === date && touched[r.name]);          // 이번에 지정한 사람의 그날 기록만 교체
+  });
+  writeRecords(records.concat(keep));
 
-  // 지각 판정 — 출근이면서 평일, 코어타임 시작 이후
-  var late = false;
-  if (mode === '출근' && !isWeekend(today) && toMinutes(nowTime) > toMinutes(cfg['코어타임시작'])) {
-    late = true;
-  }
-
-  ss().getSheetByName(SHEET_LOG)
-    .appendRow([today, name, mode, nowTime, late ? 'Y' : '', '']);
-
-  var fresh = getRecords();
-  var summary = buildSummary(monthKey(today), cfg, members, fresh);
-  var mineSummary = summary.filter(function (s) { return s.name === name; })[0] || null;
-
-  var message;
-  if (mode === '재택') message = '재택근무로 기록했습니다. 단톡방에도 잊지 말고 알려 주세요.';
-  else if (mode === '휴가') message = '휴가로 기록했습니다.';
-  else if (late) {
-    if (today >= String(cfg['벌금시작일']) && mineSummary) {
-      var nth = mineSummary.lateCount;
-      var thisFine = Math.min(cfg['기본벌금'] + cfg['인상액'] * (nth - 1), cfg['회당상한']);
-      message = '지각으로 기록했습니다. 이번 달 ' + nth + '회차 · '
-        + thisFine.toLocaleString('ko-KR') + '원 · 누적 '
-        + mineSummary.fine.toLocaleString('ko-KR') + '원';
-    } else {
-      message = '지각으로 기록했습니다. 벌금은 ' + cfg['벌금시작일'] + '부터 적용됩니다.';
-    }
-  } else message = '출근 완료. 좋은 하루 되세요.';
-
-  return {
-    ok: true, name: name, mode: mode, time: nowTime, late: late,
-    message: message, mine: mineSummary, summary: summary
-  };
+  var out = bootstrap(monthKey(date), key);
+  out.saved = keep.length;
+  out.cleared = Object.keys(touched).length - keep.length;
+  if (warnings.length) out.warnings = warnings;
+  return out;
 }
 
 /* ------------------------------------------------------------------ */
@@ -330,10 +314,13 @@ function setupSheets() {
   if (cfg.getLastRow() === 0) {
     cfg.getRange(1, 1, 1, 2).setValues([['항목', '값']]).setFontWeight('bold');
     var rows = [];
-    for (var k in DEFAULTS) rows.push([k, DEFAULTS[k]]);
+    for (var k in DEFAULTS) {
+      rows.push([k, k === '관리자키' ? Utilities.getUuid().replace(/-/g, '').slice(0, 12) : DEFAULTS[k]]);
+    }
     cfg.getRange(2, 1, rows.length, 2).setValues(rows);
-    cfg.getRange('B2:B3').setNumberFormat('@');   // 시각·날짜를 문자열로
+    cfg.getRange(2, 2).setNumberFormat('@');     // 벌금시작일을 문자열로
     cfg.setColumnWidth(1, 140);
+    cfg.setColumnWidth(2, 220);
   }
 
   var mem = book.getSheetByName(SHEET_MEMBERS) || book.insertSheet(SHEET_MEMBERS);
@@ -341,19 +328,29 @@ function setupSheets() {
     mem.getRange(1, 1, 1, 3).setValues([['이름', '활성(Y/N)', '비고']]).setFontWeight('bold');
     mem.getRange(2, 1, 1, 3).setValues([['김종엽', 'Y', '랩장']]);
     mem.setColumnWidth(1, 110);
+    mem.setFrozenRows(1);
   }
 
   var log = book.getSheetByName(SHEET_LOG) || book.insertSheet(SHEET_LOG);
   if (log.getLastRow() === 0) {
-    log.getRange(1, 1, 1, 6)
-      .setValues([['날짜', '이름', '구분', '체크시각', '지각', '비고']]).setFontWeight('bold');
+    log.getRange(1, 1, 1, 5)
+      .setValues([['날짜', '이름', '상태', '비고', '수정시각']]).setFontWeight('bold');
     log.getRange('A:A').setNumberFormat('@');
-    log.getRange('D:D').setNumberFormat('@');
     log.setFrozenRows(1);
+    log.setColumnWidth(4, 200);
+    log.setColumnWidth(5, 140);
   }
 
   var sheet1 = book.getSheetByName('시트1') || book.getSheetByName('Sheet1');
   if (sheet1 && book.getSheets().length > 3) book.deleteSheet(sheet1);
 
-  try { SpreadsheetApp.getUi().alert('시트 준비 완료 — 구성원 시트에 랩원 이름을 채워 주세요.'); } catch (ignore) {}
+  var key = getConfig()['관리자키'];
+  try {
+    SpreadsheetApp.getUi().alert(
+      '시트 준비 완료\n\n' +
+      '1) 구성원 시트에 랩원 이름을 채워 주세요.\n' +
+      '2) 관리자 열쇠: ' + key + '\n' +
+      '   관리자 링크 → attendance.html?admin=' + key + '\n\n' +
+      '이 열쇠는 랩원에게 공유하지 마세요. 설정 시트에서 언제든 바꿀 수 있습니다.');
+  } catch (ignore) {}
 }

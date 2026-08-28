@@ -18,6 +18,7 @@
   }
 }
 *{box-sizing:border-box}
+[hidden]{display:none !important}   /* .badge 의 display:inline-flex 가 [hidden] 을 덮어쓰는 문제 방지 */
 html{-webkit-text-size-adjust:100%}
 body{
   margin:0; background:var(--bg); color:var(--text);
@@ -104,30 +105,11 @@ tbody td:last-child{font-weight:700}
 caption{caption-side:bottom; padding:9px 12px; color:var(--faint); font-size:12.5px; text-align:left}
 @media (max-width:480px){
   table{min-width:0; font-size:13.5px}
-  th,td{padding:8px 9px}
+  th,td{padding:8px 7px}
   thead th{font-size:12px}
+  td.name{white-space:normal; word-break:keep-all}
 }
 
-/* ---------- 송금 계좌 ---------- */
-.account{
-  margin-top:16px; padding:16px; border-radius:12px;
-  background:var(--surface-2); border:1px dashed var(--line-strong);
-}
-.acc-label{font-size:12.5px; font-weight:650; color:var(--faint); letter-spacing:.02em}
-.acc-row{display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-top:6px}
-.acc-num{
-  font-size:19px; font-weight:750; letter-spacing:-.01em;
-  font-variant-numeric:tabular-nums; user-select:all;
-}
-.acc-bank{display:block; font-size:13px; font-weight:600; color:var(--muted); letter-spacing:0}
-.copy{
-  font-size:13.5px; font-weight:650; padding:7px 14px; border-radius:9px;
-  border:1px solid var(--line-strong); background:var(--surface); color:var(--text);
-  cursor:pointer; flex:none;
-}
-.copy:hover{filter:brightness(.97)}
-.copy.done{background:var(--accent); border-color:var(--accent); color:#fff}
-@media (prefers-color-scheme:dark){.copy.done{color:#08201d}}
 .acc-note{margin:10px 0 0; font-size:13.5px; color:var(--muted)}
 
 /* ---------- cta ---------- */
@@ -203,3 +185,46 @@ button.primary{background:var(--accent); border-color:var(--accent); color:#fff}
 .skeleton{color:var(--faint); font-size:14.5px; padding:6px 0}
 td.name{font-weight:650}
 td.zero{color:var(--faint)}
+
+/* ---------- 월 이동 ---------- */
+.monthnav{display:flex; align-items:center; gap:6px; margin:2px 0 14px}
+.monthnav span{font-size:15.5px; font-weight:700; letter-spacing:-.02em; min-width:100px; text-align:center}
+.monthnav button{
+  width:34px; height:34px; padding:0; border-radius:9px; font-size:17px; line-height:1;
+  border:1px solid var(--line-strong); background:var(--surface-2); color:var(--muted); cursor:pointer;
+}
+.monthnav button:hover{color:var(--text)}
+
+/* ---------- 관리자 입력 ---------- */
+input[type=date]{
+  width:100%; font:inherit; font-size:16px; color:var(--text);
+  background:var(--surface-2); border:1px solid var(--line-strong);
+  border-radius:11px; padding:11px 13px;
+}
+.btnrow.one{grid-template-columns:1fr; margin-top:14px}
+
+.arow{
+  display:grid; grid-template-columns:76px 108px 1fr; gap:8px; align-items:center;
+  padding:7px 0; border-top:1px solid var(--line);
+}
+.arow:first-child{border-top:0}
+.aname{font-size:15px; font-weight:650; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.arow select{
+  font-size:14.5px; padding:9px 10px; border-radius:9px;
+  background-position:calc(100% - 16px) 18px, calc(100% - 11px) 18px;
+}
+.arow .anote{
+  font-size:14.5px; padding:9px 11px; border-radius:9px; background-image:none;
+  border:1px solid var(--line); background-color:transparent; color:var(--muted);
+}
+.arow.set .anote{border-color:var(--line-strong); color:var(--text)}
+.arow.set .aname{color:var(--accent-text)}
+@media (max-width:400px){
+  .arow{grid-template-columns:62px 96px 1fr; gap:6px}
+  .arow select,.arow .anote{font-size:13.5px; padding:8px 9px}
+}
+
+/* ---------- 상태 칩 ---------- */
+.chip.leave{background:var(--surface-2); border-color:var(--line-strong)}
+.chip.absent{background:var(--warn-soft); border-color:transparent}
+.chip.absent b{color:var(--warn)}
