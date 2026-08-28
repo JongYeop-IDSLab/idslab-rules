@@ -108,6 +108,28 @@ caption{caption-side:bottom; padding:9px 12px; color:var(--faint); font-size:12.
   thead th{font-size:12px}
 }
 
+/* ---------- 송금 계좌 ---------- */
+.account{
+  margin-top:16px; padding:16px; border-radius:12px;
+  background:var(--surface-2); border:1px dashed var(--line-strong);
+}
+.acc-label{font-size:12.5px; font-weight:650; color:var(--faint); letter-spacing:.02em}
+.acc-row{display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-top:6px}
+.acc-num{
+  font-size:19px; font-weight:750; letter-spacing:-.01em;
+  font-variant-numeric:tabular-nums; user-select:all;
+}
+.acc-bank{display:block; font-size:13px; font-weight:600; color:var(--muted); letter-spacing:0}
+.copy{
+  font-size:13.5px; font-weight:650; padding:7px 14px; border-radius:9px;
+  border:1px solid var(--line-strong); background:var(--surface); color:var(--text);
+  cursor:pointer; flex:none;
+}
+.copy:hover{filter:brightness(.97)}
+.copy.done{background:var(--accent); border-color:var(--accent); color:#fff}
+@media (prefers-color-scheme:dark){.copy.done{color:#08201d}}
+.acc-note{margin:10px 0 0; font-size:13.5px; color:var(--muted)}
+
 /* ---------- cta ---------- */
 .cta{
   display:flex; align-items:center; justify-content:space-between; gap:14px;
