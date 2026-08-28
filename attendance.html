@@ -26,6 +26,15 @@
 
 <main>
 
+  <section id="setup" hidden>
+    <div class="empty">
+      <div class="empty-tag" id="setupTag">준비 중</div>
+      <p class="empty-title" id="setupTitle">근태 시스템을 준비하고 있습니다</p>
+      <p class="empty-desc" id="setupDesc">연결이 끝나면 이곳에서 이번 달 지각 · 재택 · 휴가 현황과 누적 벌금을 확인할 수 있습니다.</p>
+      <button type="button" id="retryBtn" hidden>다시 시도</button>
+    </div>
+  </section>
+
   <section id="today">
     <div class="sec-head"><span class="num">今</span><h2>오늘</h2></div>
     <p class="sec-sub" id="clock">—</p>
@@ -37,7 +46,7 @@
     <p class="sec-sub">해당 날짜에 <strong>예외가 있는 사람만</strong> 지정하세요. 비워 두면 정상 출근으로 처리됩니다.</p>
 
     <label class="field">
-      <span class="lab">날짜</span>
+      <span class="lab">날짜 <span class="lab-date" id="adminDateLabel"></span></span>
       <input type="date" id="adminDate">
     </label>
 
@@ -196,10 +205,18 @@ function renderBoard() {
 
 /* ---------------- 관리자 입력 ---------------- */
 
+function korDate(ymd) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return "";
+  var days = ["일", "월", "화", "수", "목", "금", "토"];
+  var d = new Date(Number(ymd.slice(0, 4)), Number(ymd.slice(5, 7)) - 1, Number(ymd.slice(8, 10)));
+  return d.getFullYear() + "년 " + (d.getMonth() + 1) + "월 " + d.getDate() + "일 (" + days[d.getDay()] + ")";
+}
+
 function renderAdminRows() {
   var date = $("adminDate").value;
   var box = $("adminRows");
   box.innerHTML = "";
+  $("adminDateLabel").textContent = korDate(date);
   if (!date) return;
 
   var current = {};
@@ -253,6 +270,15 @@ function saveDay() {
 
 /* ---------------- 부트 ---------------- */
 
+function showSetup(title, desc, tag, retry) {
+  ["today", "board", "detail", "admin"].forEach(function (id) { $(id).hidden = true; });
+  $("setup").hidden = false;
+  $("setupTag").textContent = tag;
+  $("setupTitle").textContent = title;
+  $("setupDesc").textContent = desc;
+  $("retryBtn").hidden = !retry;
+}
+
 function apply(d) {
   state.month = d.month;
   state.members = d.members || [];
@@ -261,6 +287,8 @@ function apply(d) {
   state.config = d.config || {};
   state.admin = !!d.admin;
 
+  $("setup").hidden = true;
+  ["today", "board", "detail"].forEach(function (id) { $(id).hidden = false; });
   $("adminBadge").hidden = !state.admin;
   $("admin").hidden = !state.admin;
 
@@ -274,14 +302,25 @@ function apply(d) {
 }
 
 function load(month) {
+  if (!API_URL) {
+    showSetup(
+      "근태 시스템을 준비하고 있습니다",
+      "연결이 끝나면 이곳에서 이번 달 지각 · 재택 · 휴가 현황과 누적 벌금을 확인할 수 있습니다.",
+      "준비 중", false);
+    return;
+  }
   api(null, month).then(function (d) {
-    if (!d.ok) { say(d.error || "불러오지 못했습니다.", "err"); return; }
-    if (ADMIN_KEY && !d.admin) say("관리자 열쇠가 올바르지 않습니다. 조회 전용으로 표시합니다.", "err");
+    if (!d.ok) {
+      showSetup("현황을 불러오지 못했습니다", d.error || "잠시 후 다시 시도해 주세요.", "오류", true);
+      return;
+    }
     apply(d);
-  }).catch(function (e) {
-    $("todayChips").innerHTML = '<div class="skeleton">' + (e.message || "서버에 연결하지 못했습니다.") + "</div>";
-    $("detailChips").innerHTML = '<div class="skeleton">—</div>';
-    $("boardBody").innerHTML = '<tr><td colspan="5" class="skeleton">—</td></tr>';
+    if (ADMIN_KEY && !d.admin) say("관리자 열쇠가 올바르지 않습니다. 조회 전용으로 표시합니다.", "err");
+  }).catch(function () {
+    showSetup(
+      "현황을 불러오지 못했습니다",
+      "네트워크가 불안정하거나 서버가 응답하지 않습니다. 잠시 후 다시 시도해 주세요.",
+      "연결 실패", true);
   });
 }
 
@@ -296,6 +335,7 @@ document.addEventListener("DOMContentLoaded", function () {
     if (m && m !== state.month) load(m); else renderAdminRows();
   });
   $("saveBtn").addEventListener("click", saveDay);
+  $("retryBtn").addEventListener("click", function () { load(state.month); });
   $("adminRows").addEventListener("change", function (ev) {
     if (ev.target.tagName === "SELECT") {
       ev.target.closest(".arow").classList.toggle("set", !!ev.target.value);

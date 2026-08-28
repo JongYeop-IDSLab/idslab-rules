@@ -8,7 +8,7 @@ index.html            수칙 공지 (8/31 시행)
 attendance.html       근태 조회 (관리자만 입력 가능)
 style.css             두 페이지 공용 스타일
 apps-script/Code.gs   구글 시트 백엔드 (웹 앱으로 배포)
-apps-script/fine_test.js  벌금 계산 로직 테스트 (node로 실행)
+apps-script/*_test.js     로직 테스트 (node로 실행)
 ```
 
 ---
@@ -149,10 +149,26 @@ https://<GITHUB_ID>.github.io/idslab-rules/attendance.html?admin=<관리자키>
 - **코드 수정 후** — Apps Script를 고쳤으면 **배포 → 배포 관리 → 편집(연필) → 버전: 새 버전 → 배포**를 해야 반영됩니다. URL은 그대로입니다.
 - **한계** — 열쇠를 아는 사람은 누구나 수정할 수 있습니다. 랩 내부용으로는 충분하지만, 엄밀한 계정 인증은 아닙니다.
 
+## 옛 구조에서 옮기기
+
+예전 '출근 체크' 방식으로 시트를 만들었다면 컬럼이 다릅니다
+(`날짜 | 이름 | 구분 | 체크시각 | 지각 | 비고`). 그대로 두면 체크시각이 비고 자리에
+`Sat Dec 30 1899 …` 형태로 나타납니다. 새 코드를 붙여넣은 뒤 편집기에서
+**`migrateOldSheet`** 를 한 번 실행하면 새 구조로 옮겨집니다.
+
+- 지각 · 재택 · 휴가 · 결근 기록은 그대로 유지됩니다
+- 정상 출근 행은 사라집니다 (새 방식은 예외만 기록합니다)
+- 이미 새 구조면 아무것도 하지 않고 넘어갑니다
+
+옮긴 뒤 **배포 → 배포 관리 → 편집 → 버전: 새 버전 → 배포**를 해주세요.
+
+---
+
 ## 테스트
 
 벌금 계산 로직만 따로 돌려볼 수 있습니다.
 
 ```bash
-node apps-script/fine_test.js
+node apps-script/fine_test.js       # 벌금 계산 · 권한 판정
+node apps-script/migrate_test.js    # 옛 시트 구조 이전
 ```

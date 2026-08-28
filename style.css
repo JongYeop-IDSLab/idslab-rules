@@ -228,3 +228,14 @@ input[type=date]{
 .chip.leave{background:var(--surface-2); border-color:var(--line-strong)}
 .chip.absent{background:var(--warn-soft); border-color:transparent}
 .chip.absent b{color:var(--warn)}
+
+/* ---------- 준비 중 · 오류 안내 ---------- */
+.empty{text-align:center; padding:26px 8px 22px}
+.empty-tag{
+  display:inline-block; font-size:12.5px; font-weight:700; letter-spacing:.02em;
+  padding:5px 12px; border-radius:999px; background:var(--accent-soft); color:var(--accent-text);
+}
+.empty-title{margin:14px 0 6px; font-size:18px; font-weight:750; letter-spacing:-.02em}
+.empty-desc{margin:0 auto; max-width:34ch; font-size:14.5px; color:var(--muted); line-height:1.65}
+#retryBtn{margin-top:16px; padding:10px 22px; font-size:14.5px}
+.lab-date{font-weight:600; color:var(--accent-text); margin-left:6px}
