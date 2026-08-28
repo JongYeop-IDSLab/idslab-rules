@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>근태 · 벌금 현황 — IDS Lab</title>
+<meta name="description" content="IDS Lab 출근 체크와 이번 달 지각·벌금 현황">
+<meta name="theme-color" content="#0f766e">
+<link rel="preconnect" href="https://cdn.jsdelivr.net">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="stylesheet" href="./style.css">
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <a class="backlink" href="./index.html">← 연구실 수칙</a>
+  <div class="eyebrow">
+    <span class="badge" id="todayBadge">—</span>
+    <span class="badge plain" id="coreBadge">코어타임 10:00 – 15:00</span>
+  </div>
+  <h1>근태 · 벌금 현황</h1>
+  <p class="lede">출근하면 아래에서 체크해 주세요. 이번 달 지각 횟수와 누적 벌금이 자동으로 계산됩니다.</p>
+</header>
+
+<main>
+
+  <section id="checkin">
+    <div class="sec-head"><span class="num">✓</span><h2>오늘 체크</h2></div>
+    <p class="sec-sub" id="clock">—</p>
+
+    <label class="field">
+      <span class="lab">이름</span>
+      <select id="name"><option value="">불러오는 중…</option></select>
+    </label>
+
+    <div class="btnrow">
+      <button class="primary" data-mode="출근" disabled>출근</button>
+      <button data-mode="재택" disabled>재택</button>
+      <button data-mode="휴가" disabled>휴가</button>
+    </div>
+
+    <div class="msg" id="msg"></div>
+  </section>
+
+  <section id="mine">
+    <div class="sec-head"><span class="num">나</span><h2>이번 달 내 현황</h2></div>
+    <p class="sec-sub" id="mineSub">이름을 선택하면 표시됩니다.</p>
+    <div class="stats" id="mineStats" hidden>
+      <div class="stat"><div class="k">지각</div><div class="v" id="sLate">0회</div></div>
+      <div class="stat"><div class="k">누적 벌금</div><div class="v" id="sFine">0원</div></div>
+      <div class="stat"><div class="k">다음 지각 시</div><div class="v" id="sNext">—</div></div>
+      <div class="stat"><div class="k">재택 사용</div><div class="v" id="sRemote">—</div></div>
+    </div>
+  </section>
+
+  <section id="today">
+    <div class="sec-head"><span class="num">今</span><h2>오늘 체크한 사람</h2></div>
+    <p class="sec-sub">이름 옆 시각은 체크한 시간입니다.</p>
+    <div class="chips" id="todayChips"><div class="skeleton">불러오는 중…</div></div>
+  </section>
+
+  <section id="board">
+    <div class="sec-head"><span class="num">月</span><h2>이번 달 전체</h2></div>
+    <p class="sec-sub" id="boardSub">매월 1일에 초기화됩니다.</p>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>이름</th><th>기록일</th><th>재택</th><th>지각</th><th>벌금</th></tr></thead>
+        <tbody id="boardBody"><tr><td colspan="5" class="skeleton">불러오는 중…</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <p>기록이 잘못됐으면 랩장에게 알려 주세요. 구글 시트에서 바로 수정할 수 있습니다.</p>
+  <p>IDS Lab (Intelligent Digital Systems Lab), Sungkyunkwan University</p>
+</footer>
+
+</div>
+
+<script>
+/* ------------------------------------------------------------------
+   Apps Script 웹 앱 배포 후 받은 /exec 주소를 여기에 붙여넣으세요.
+   예: https://script.google.com/macros/s/AKfycb.../exec
+------------------------------------------------------------------ */
+var API_URL = "";
+
+var $ = function (id) { return document.getElementById(id); };
+var state = { members: [], summary: [], config: null, month: "" };
+
+function won(n) { return Number(n || 0).toLocaleString("ko-KR") + "원"; }
+
+function say(text, kind) {
+  var el = $("msg");
+  el.textContent = text;
+  el.className = "msg show " + (kind || "info");
+}
+
+function remember(name) { try { localStorage.setItem("idslab.name", name); } catch (e) {} }
+function recall() { try { return localStorage.getItem("idslab.name") || ""; } catch (e) { return ""; } }
+
+function api(action, payload) {
+  if (!API_URL) {
+    return Promise.reject(new Error("API 주소가 아직 연결되지 않았습니다. attendance.html 의 API_URL 을 채워 주세요."));
+  }
+  var url = API_URL, opts = {};
+  if (payload) {
+    opts = {
+      method: "POST",
+      // text/plain 으로 보내야 프리플라이트 없이 Apps Script 가 받습니다.
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify(payload)
+    };
+  } else {
+    url += "?action=" + encodeURIComponent(action);
+  }
+  return fetch(url, opts).then(function (r) { return r.json(); });
+}
+
+function setButtons(on) {
+  var btns = document.querySelectorAll(".btnrow button");
+  for (var i = 0; i < btns.length; i++) btns[i].disabled = !on;
+}
+
+function renderClock() {
+  var d = new Date();
+  var days = ["일", "월", "화", "수", "목", "금", "토"];
+  var pad = function (n) { return (n < 10 ? "0" : "") + n; };
+  $("clock").textContent =
+    d.getFullYear() + "년 " + (d.getMonth() + 1) + "월 " + d.getDate() + "일 ("
+    + days[d.getDay()] + ") " + pad(d.getHours()) + ":" + pad(d.getMinutes());
+  $("todayBadge").textContent = (d.getMonth() + 1) + "월 " + d.getDate() + "일 (" + days[d.getDay()] + ")";
+}
+
+function renderMine() {
+  var name = $("name").value;
+  var mine = state.summary.filter(function (s) { return s.name === name; })[0];
+  if (!name || !mine) {
+    $("mineStats").hidden = true;
+    $("mineSub").textContent = "이름을 선택하면 표시됩니다.";
+    return;
+  }
+  var c = state.config || {};
+  $("mineStats").hidden = false;
+  $("mineSub").textContent = name + " 님 · " + state.month;
+  $("sLate").textContent = mine.lateCount + "회";
+  $("sLate").className = "v" + (mine.lateCount ? " alert" : "");
+  $("sFine").textContent = won(mine.fine);
+  $("sFine").className = "v" + (mine.fine ? " alert" : "");
+  $("sNext").textContent = won(mine.nextFine);
+  $("sRemote").textContent = mine.remote + " / " + (c.remoteMonthly || 3) + "회";
+}
+
+function renderToday(records) {
+  var box = $("todayChips");
+  box.innerHTML = "";
+  if (!records || !records.length) {
+    box.innerHTML = '<div class="skeleton">아직 아무도 체크하지 않았습니다.</div>';
+    return;
+  }
+  records.forEach(function (r) {
+    var cls = "chip" + (r.late ? " late" : (r.mode === "재택" ? " remote" : ""));
+    var tag = r.mode === "출근" ? (r.late ? "지각" : "출근") : r.mode;
+    var el = document.createElement("span");
+    el.className = cls;
+    el.innerHTML = "<b>" + r.name + "</b> · " + tag + " " + r.time;
+    box.appendChild(el);
+  });
+}
+
+function renderBoard() {
+  var body = $("boardBody");
+  body.innerHTML = "";
+  if (!state.summary.length) {
+    body.innerHTML = '<tr><td colspan="5" class="skeleton">기록이 없습니다.</td></tr>';
+    return;
+  }
+  state.summary.forEach(function (s) {
+    var tr = document.createElement("tr");
+    tr.innerHTML =
+      '<td class="name">' + s.name + (s.note ? ' <span class="note">' + s.note + "</span>" : "") + "</td>" +
+      "<td>" + s.days + "</td>" +
+      '<td class="' + (s.remote ? "" : "zero") + '">' + s.remote + "</td>" +
+      '<td class="' + (s.lateCount ? "" : "zero") + '">' + s.lateCount + "</td>" +
+      '<td class="' + (s.fine ? "" : "zero") + '">' + won(s.fine) + "</td>";
+    body.appendChild(tr);
+  });
+  $("boardSub").textContent = state.month + " 기준 · 매월 1일에 초기화됩니다.";
+}
+
+function applyBootstrap(d) {
+  state.members = d.members || [];
+  state.summary = d.summary || [];
+  state.config = d.config || {};
+  state.month = d.month || "";
+
+  var sel = $("name"), saved = recall();
+  sel.innerHTML = '<option value="">— 이름 선택 —</option>';
+  state.members.forEach(function (n) {
+    var o = document.createElement("option");
+    o.value = n; o.textContent = n;
+    if (n === saved) o.selected = true;
+    sel.appendChild(o);
+  });
+
+  if (d.config) {
+    $("coreBadge").textContent = "코어타임 " + d.config.coreStart + " – 15:00";
+  }
+  setButtons(true);
+  renderToday(d.todayRecords);
+  renderBoard();
+  renderMine();
+}
+
+function load() {
+  api("bootstrap").then(function (d) {
+    if (!d.ok) { say(d.error || "불러오지 못했습니다.", "err"); return; }
+    applyBootstrap(d);
+  }).catch(function (e) {
+    say(e.message || "서버에 연결하지 못했습니다.", "err");
+    $("name").innerHTML = '<option value="">연결 안 됨</option>';
+    $("todayChips").innerHTML = '<div class="skeleton">—</div>';
+    $("boardBody").innerHTML = '<tr><td colspan="5" class="skeleton">—</td></tr>';
+  });
+}
+
+document.addEventListener("DOMContentLoaded", function () {
+  renderClock();
+  setInterval(renderClock, 30000);
+
+  $("name").addEventListener("change", function () {
+    remember(this.value);
+    renderMine();
+  });
+
+  document.querySelectorAll(".btnrow button").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var name = $("name").value;
+      if (!name) { say("이름을 먼저 선택해 주세요.", "err"); return; }
+      var mode = btn.getAttribute("data-mode");
+      if (mode === "휴가" && !confirm(name + " 님, 오늘을 휴가로 기록할까요?")) return;
+
+      setButtons(false);
+      say("기록하는 중…", "info");
+      api(null, { action: "checkin", name: name, mode: mode }).then(function (d) {
+        setButtons(true);
+        if (!d.ok) { say(d.error, "err"); return; }
+        say(d.message, d.late ? "err" : "ok");
+        state.summary = d.summary || state.summary;
+        renderMine();
+        renderBoard();
+        return api("bootstrap").then(function (b) { if (b.ok) renderToday(b.todayRecords); });
+      }).catch(function (e) {
+        setButtons(true);
+        say(e.message || "기록에 실패했습니다. 다시 시도해 주세요.", "err");
+      });
+    });
+  });
+
+  load();
+});
+</script>
+</body>
+</html>
